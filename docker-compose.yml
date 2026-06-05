@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: yt_memory_db
+    restart: always
+    environment:
+      POSTGRES_USER: yt_memory_user
+      POSTGRES_PASSWORD: yt_memory_password
+      POSTGRES_DB: yt_memory_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: yt_memory_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
