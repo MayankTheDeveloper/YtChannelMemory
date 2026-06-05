@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -14,8 +14,7 @@ class MemoryRead(MemoryCreate):
     last_recalled_at: Optional[datetime] = None
     recall_count: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MemorySearch(BaseModel):
     channel_id: int

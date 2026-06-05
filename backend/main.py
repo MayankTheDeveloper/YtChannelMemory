@@ -46,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api.v1 import auth, channels, insights, competitors, trends, reports, creation, recommendations, memory
+from app.api.v1 import auth, channels, insights, competitors, trends, reports, creation, memory
 
 @app.get("/")
 def read_root():
@@ -95,7 +95,6 @@ async def ready_check():
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(channels.router, prefix="/api/v1/channels", tags=["channels"])
 app.include_router(insights.router, prefix="/api/v1/insights", tags=["insights"])
-app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])
 app.include_router(trends.router, prefix="/api/v1/trends", tags=["trends"])
 app.include_router(competitors.router, prefix="/api/v1/competitors", tags=["competitors"])
 app.include_router(creation.router, prefix="/api/v1/creation", tags=["creation"])
