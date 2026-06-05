@@ -27,6 +27,9 @@ export default function DashboardLayout({
               <Link href="/dashboard/recommendations" className="transition-colors hover:text-foreground/80 text-foreground/60">
                 Recommendations
               </Link>
+              <Link href="/dashboard/memory" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                Memory
+              </Link>
               
               <span className="text-muted-foreground ml-4 border-l pl-4">Studio:</span>
               <Link href="/dashboard/content-briefs" className="transition-colors hover:text-foreground/80 text-foreground/60">
