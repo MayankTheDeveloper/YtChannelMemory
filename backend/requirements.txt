@@ -7,13 +7,20 @@ alembic>=1.13.1
 psycopg2-binary>=2.9.9
 asyncpg>=0.29.0
 celery>=5.3.6
-redis>=5.0.1
+redis==4.6.0
 langgraph>=0.0.26
 langchain-core>=0.1.28
-langchain-openai>=0.0.8
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-python-multipart>=0.0.9
+langchain-google-genai
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# Phase 1.5 Additions
+loguru
+sentry-sdk[fastapi]
+fastapi-limiter==0.1.6
+fastapi-cache2[redis]==0.2.1
+tenacity
 google-api-python-client>=2.118.0
 google-auth-oauthlib>=1.2.0
 python-dotenv>=1.0.1

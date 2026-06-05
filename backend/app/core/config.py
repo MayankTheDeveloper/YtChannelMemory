@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     
     YOUTUBE_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
 
