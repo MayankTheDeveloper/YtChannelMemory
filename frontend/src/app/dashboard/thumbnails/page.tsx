@@ -1,1 +1,2 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; export default function Page() { return <div className="space-y-4"><h2 className="text-3xl font-bold tracking-tight capitalize">thumbnails</h2><Card><CardHeader><CardTitle>Studio Manager</CardTitle></CardHeader><CardContent><p>Review and approve your AI generated content here. Coming soon...</p></CardContent></Card></div> }

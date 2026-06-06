@@ -2,7 +2,7 @@ import asyncio
 from app.worker.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.db.models import Channel, Video, Comment, AudienceInsight, Recommendation, AgentRun
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from app.langgraph.workflow import app_workflow
 import json
 
@@ -250,21 +250,17 @@ async def process_analyze_channel(channel_id: int):
                     personas=final_state.get("audience_insights", {}).get("personas", []),
                     pain_points=final_state.get("audience_insights", {}).get("pain_points", []),
                     interests=final_state.get("audience_insights", {}).get("interests", []),
-                    content_gaps=final_state.get("competitor_insights", {}).get("content_gaps", []),
-                    requested_topics=final_state.get("audience_insights", {}).get("requested_topics", [])
                 )
                 db.add(audience_insight)
             else:
                 audience_insight.personas = final_state.get("audience_insights", {}).get("personas", [])
                 audience_insight.pain_points = final_state.get("audience_insights", {}).get("pain_points", [])
                 audience_insight.interests = final_state.get("audience_insights", {}).get("interests", [])
-                audience_insight.content_gaps = final_state.get("competitor_insights", {}).get("content_gaps", [])
-                audience_insight.requested_topics = final_state.get("audience_insights", {}).get("requested_topics", [])
 
             # Clear out previous recommendations to prevent duplicate dashboard entries
             from app.db.models import Recommendation
             await db.execute(
-                db.delete(Recommendation).where(Recommendation.channel_id == channel_id)
+                delete(Recommendation).where(Recommendation.channel_id == channel_id)
             )
 
             # Save Recommendations

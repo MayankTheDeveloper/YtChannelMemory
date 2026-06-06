@@ -5,7 +5,7 @@ from app.langgraph.state import ChannelAnalysisState
 from app.core.config import settings
 
 def analyze_trends_node(state: ChannelAnalysisState) -> ChannelAnalysisState:
-    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-pro", temperature=0)
+    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0)
     
     trends = state.get("raw_trends", [])
     if not trends:

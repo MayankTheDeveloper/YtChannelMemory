@@ -4,7 +4,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import settings
 
 def generate_metadata(brief_data: dict, script_data: dict) -> dict:
-    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-pro", temperature=0.7)
+    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0.7)
     
     system_prompt = """
     You are an expert YouTube SEO and Metadata Specialist.
@@ -35,7 +35,7 @@ def generate_metadata(brief_data: dict, script_data: dict) -> dict:
         return {}
 
 def generate_thumbnail_prompts(brief_data: dict, title: str) -> list:
-    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-pro", temperature=0.7)
+    llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0.7)
     
     system_prompt = """
     You are an expert YouTube Thumbnail Designer.
