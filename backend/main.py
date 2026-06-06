@@ -27,6 +27,25 @@ async def lifespan(app: FastAPI):
     redis = aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
     await FastAPILimiter.init(redis)
+    
+    # Seed default user if it does not exist
+    from app.db.session import SessionLocal
+    from app.db.models import User
+    from sqlalchemy import select
+    try:
+        async with SessionLocal() as db:
+            result = await db.execute(select(User).filter(User.id == 1))
+            user = result.scalars().first()
+            if not user:
+                email_result = await db.execute(select(User).filter(User.email == "demo@example.com"))
+                existing_email = email_result.scalars().first()
+                if not existing_email:
+                    default_user = User(id=1, email="demo@example.com", hashed_password="demo_password_hash")
+                    db.add(default_user)
+                    await db.commit()
+    except Exception as e:
+        print(f"Error seeding default user: {e}")
+        
     yield
     # Shutdown
     await redis.close()

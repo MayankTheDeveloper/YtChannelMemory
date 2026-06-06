@@ -386,6 +386,7 @@ async def get_channel_dashboard(
                 "recall_count": m.recall_count,
             }
             for m in memories
+        ],
         "analysis_status": latest_run.status if latest_run else "not_started",
         "video_insights": latest_run.output.get("video_insights", {}) if latest_run and latest_run.output else {},
     }

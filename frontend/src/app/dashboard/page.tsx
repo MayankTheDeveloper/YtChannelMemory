@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Sparkles, RefreshCw, Trash2, ArrowRight, Video, Users, Activity, AlertCircle, FileText, CheckCircle2 } from "lucide-react"
+import { Sparkles, RefreshCw, Trash2, ArrowRight, Video, Users, Activity, AlertCircle, FileText, CheckCircle2, ExternalLink } from "lucide-react"
 
 const Youtube = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
