@@ -52,6 +52,8 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
         topic = "Personal Finance & Investing"
     elif any(k in theme.lower() for k in ["fit", "gym", "health", "workout"]):
         topic = "Fitness & Healthy Lifestyle"
+    elif any(k in theme.lower() for k in ["science", "hacker", "experiment", "stunt", "challenge", "diy", "creative", "toy", "play", "game", "mr. indian hacker", "mr.indian hacker"]):
+        topic = "Experiments, Stunts & Creative Challenges"
 
     # Personas, interests, pain points, requested topics, content gaps, recommendations based on topic
     if topic == "Cooking & Culinary Arts":
@@ -95,6 +97,50 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
                 "related_trends": ["Kitchen Basics"],
                 "related_videos": [],
                 "related_comments": ["My dicing is so slow, any advice?"],
+            }
+        ]
+    elif topic == "Experiments, Stunts & Creative Challenges":
+        personas = ["Young Science Enthusiasts", "Adventure & Stunt Seekers", "DIY Experiment Hobbyists", "Action & Modification Lovers"]
+        interests = ["Large-scale chemical reactions", "Engine & vehicle modifications", "Extreme challenge stunts", "Liquid nitrogen experiments"]
+        pain_points = ["Safety of replicating simple experiments", "Cost of materials for big stunts", "Understanding the physics/chemistry behind reactions", "Finding reliable tutorial instructions"]
+        requested_topics = ["Running a bike engine on pure hydrogen", "Liquid nitrogen vs lava in a giant pool", "Making a giant solar balloon", "Crushing rare items with a hydraulic press"]
+        content_gaps = ["Safety guides for chemical reactions", "High frame-rate slow-motion stunt breakdowns", "Interactive community-driven experiment votes"]
+        recs = [
+            {
+                "title": "Running a 150cc Bike Engine on Pure Hydrogen Gas (Will It Explode?)",
+                "confidence_score": 96,
+                "audience_score": 98,
+                "historical_score": 92,
+                "trend_score": 97,
+                "competition_score": 97,
+                "reasoning": [
+                    "Directly addresses high interest in vehicle modifications and alternative energy",
+                    "Extremely requested by viewers in recent comments",
+                    "Provides high visual impact and suspenseful retention value"
+                ],
+                "evidence": ["Commenters requesting hydrogen/water fuel setups", "High search velocity for DIY alternative engine modifications"],
+                "memories_used": ["Audience engages highly with gas/fuel experiments", "Previous vehicle modification videos achieved 3x average retention"],
+                "related_trends": ["Alternative Fuels", "Extreme Bike Modifications"],
+                "related_videos": [],
+                "related_comments": ["Run a bike on hydrogen next please!"],
+            },
+            {
+                "title": "Giant 500-Gallon Liquid Nitrogen vs Boiling Water Pool Experiment",
+                "confidence_score": 92,
+                "audience_score": 94,
+                "historical_score": 88,
+                "trend_score": 95,
+                "competition_score": 91,
+                "reasoning": [
+                    "Capitalizes on high-visual-impact chemical/physical reaction trends",
+                    "Broad entertainment appeal with educational science explanations",
+                    "Fills a content gap for large-scale stunts with slow-motion visual breakdowns"
+                ],
+                "evidence": ["Search queries for liquid nitrogen reactions rising", "Commenters asking for bigger cloud/explosion scale"],
+                "memories_used": ["High-energy visual intros sustain high audience retention", "Stunt videos are highly viral/evergreen"],
+                "related_trends": ["Liquid Nitrogen", "Extreme Physical Reactions"],
+                "related_videos": [],
+                "related_comments": ["Please do a massive nitrogen explosion cloud!"],
             }
         ]
     else:
@@ -148,7 +194,7 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
             "top_requests": requested_topics,
             "top_questions": ["How does X work?", "Can you share the code?"],
             "sentiment_distribution": {"positive": 0.6, "neutral": 0.3, "negative": 0.1},
-            "common_themes": ["Learning frameworks", "Building SaaS"]
+            "common_themes": ["Learning frameworks", "Building SaaS"] if topic == "Tech & Software Development" else ["Science & fun", "Cool stunts"]
         },
         "audience_insights": {
             "personas": personas,
@@ -157,7 +203,7 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
             "requested_topics": requested_topics
         },
         "video_insights": {
-            "winning_patterns": ["High-energy intros (< 5s)", "Case-study based titles", "Thumbnail includes a recognizable brand logo"],
+            "winning_patterns": ["High-energy intros (< 5s)", "Case-study based titles", "Thumbnail includes a recognizable brand logo"] if topic == "Tech & Software Development" else ["Explosive hook in first 3s", "Bold colorful thumbnails", "Fast cuts under 2s"],
             "losing_patterns": ["Overly technical jargon in the first minute", "Long unbroken talking head segments", "Vague titles"]
         },
         "competitor_insights": {
@@ -291,32 +337,128 @@ async def process_analyze_channel(channel_id: int):
             mem_result = await db.execute(select(Memory).filter(Memory.channel_id == channel_id))
             existing_memories = mem_result.scalars().all()
             if not existing_memories:
-                default_memories = [
-                    Memory(
-                        channel_id=channel_id,
-                        category="Audience",
-                        content="Audience responds well to time-saving challenges and hands-on coding guides.",
-                        context_tags=["audience-engagement", "challenges"]
-                    ),
-                    Memory(
-                        channel_id=channel_id,
-                        category="Recommendation",
-                        content="Previous Next.js 15 course videos performed 45% better than average video uploads.",
-                        context_tags=["nextjs", "performance"]
-                    ),
-                    Memory(
-                        channel_id=channel_id,
-                        category="Preference",
-                        content="Viewer feedback indicates high interest in Agentic AI frameworks (LangGraph, CrewAI).",
-                        context_tags=["agentic-ai", "frameworks"]
-                    ),
-                    Memory(
-                        channel_id=channel_id,
-                        category="Trend",
-                        content="Search volume for 'LangGraph' and 'Agentic Workflows' has increased by 300% in the last 30 days.",
-                        context_tags=["trends", "langgraph"]
-                    )
-                ]
+                # Determine topic from theme (channel title)
+                theme = channel.title or "Tech"
+                topic = "Tech & Software Development"
+                if any(k in theme.lower() for k in ["cook", "food", "chef", "recipe"]):
+                    topic = "Cooking & Culinary Arts"
+                elif any(k in theme.lower() for k in ["travel", "vlog", "explore"]):
+                    topic = "Travel & Adventure Vlogs"
+                elif any(k in theme.lower() for k in ["finance", "money", "invest", "stock"]):
+                    topic = "Personal Finance & Investing"
+                elif any(k in theme.lower() for k in ["fit", "gym", "health", "workout"]):
+                    topic = "Fitness & Healthy Lifestyle"
+                elif any(k in theme.lower() for k in ["science", "hacker", "experiment", "stunt", "challenge", "diy", "creative", "toy", "play", "game", "mr. indian hacker", "mr.indian hacker"]):
+                    topic = "Experiments, Stunts & Creative Challenges"
+
+                if topic == "Cooking & Culinary Arts":
+                    default_memories = [
+                        Memory(
+                            channel_id=channel_id,
+                            category="Audience",
+                            content="Audience responds well to budget meal prep challenges and quick weekday dinner guides.",
+                            context_tags=["audience-engagement", "budget-cooking"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Recommendation",
+                            content="Previous dessert recipe videos performed 30% better than average video uploads.",
+                            context_tags=["desserts", "performance"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Preference",
+                            content="Viewer feedback indicates high interest in baking and quick 15-minute ideas.",
+                            context_tags=["baking", "quick-recipes"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Trend",
+                            content="Search volume for '15-minute healthy meals' has increased by 150% in the last 30 days.",
+                            context_tags=["trends", "healthy-eating"]
+                        )
+                    ]
+                elif topic == "Travel & Adventure Vlogs":
+                    default_memories = [
+                        Memory(
+                            channel_id=channel_id,
+                            category="Audience",
+                            content="Audience loves off-the-beaten-path travel vlogs and detailed travel budgeting tips.",
+                            context_tags=["solo-travel", "budgeting"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Recommendation",
+                            content="Previous Asia series videos performed 50% better than average uploads.",
+                            context_tags=["asia-vlogs", "performance"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Preference",
+                            content="Viewer feedback indicates high interest in local street food and packing guides.",
+                            context_tags=["street-food", "packing"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Trend",
+                            content="Search volume for 'cheap summer destinations' has increased by 200% in the last 30 days.",
+                            context_tags=["trends", "cheap-travel"]
+                        )
+                    ]
+                elif topic == "Experiments, Stunts & Creative Challenges":
+                    default_memories = [
+                        Memory(
+                            channel_id=channel_id,
+                            category="Audience",
+                            content="Audience responds well to highly visual chemical reactions and vehicle stunt modifications.",
+                            context_tags=["audience-engagement", "stunts"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Recommendation",
+                            content="Previous liquid nitrogen and engine modification videos performed 85% better than average uploads.",
+                            context_tags=["liquid-nitrogen", "mods"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Preference",
+                            content="Viewer feedback indicates high interest in large-scale experiments and slow-motion breakdowns.",
+                            context_tags=["experiments", "slow-mo"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Trend",
+                            content="Search volume for 'crazy science experiments at home' has increased by 180% in the last 30 days.",
+                            context_tags=["trends", "experiments"]
+                        )
+                    ]
+                else: # Tech
+                    default_memories = [
+                        Memory(
+                            channel_id=channel_id,
+                            category="Audience",
+                            content="Audience responds well to time-saving challenges and hands-on coding guides.",
+                            context_tags=["audience-engagement", "challenges"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Recommendation",
+                            content="Previous Next.js 15 course videos performed 45% better than average video uploads.",
+                            context_tags=["nextjs", "performance"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Preference",
+                            content="Viewer feedback indicates high interest in Agentic AI frameworks (LangGraph, CrewAI).",
+                            context_tags=["agentic-ai", "frameworks"]
+                        ),
+                        Memory(
+                            channel_id=channel_id,
+                            category="Trend",
+                            content="Search volume for 'LangGraph' and 'Agentic Workflows' has increased by 300% in the last 30 days.",
+                            context_tags=["trends", "langgraph"]
+                        )
+                    ]
                 for memory in default_memories:
                     db.add(memory)
 

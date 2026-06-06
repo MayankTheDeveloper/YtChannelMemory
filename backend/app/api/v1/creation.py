@@ -317,3 +317,239 @@ async def schedule_video(
     await db.commit()
     
     return {"status": "success", "youtube_id": yt_id}
+
+@router.get("/content-briefs")
+async def list_content_briefs(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(ContentBrief).order_by(ContentBrief.created_at.desc()))
+    briefs = result.scalars().all()
+    data = []
+    for b in briefs:
+        data.append({
+            "id": b.id,
+            "recommendation_id": b.recommendation_id,
+            "topic": b.topic,
+            "target_audience": b.target_audience,
+            "video_goal": b.video_goal,
+            "key_points": b.key_points,
+            "content_angle": b.content_angle,
+            "competitor_reference": b.competitor_reference,
+            "estimated_length": b.estimated_length,
+            "status": b.status,
+            "created_at": b.created_at.isoformat() if b.created_at else None
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/content-briefs/{brief_id}")
+async def get_content_brief(
+    brief_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(ContentBrief).filter(ContentBrief.id == brief_id))
+    b = result.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    return {
+        "status": "success",
+        "data": {
+            "id": b.id,
+            "recommendation_id": b.recommendation_id,
+            "topic": b.topic,
+            "target_audience": b.target_audience,
+            "video_goal": b.video_goal,
+            "key_points": b.key_points,
+            "content_angle": b.content_angle,
+            "competitor_reference": b.competitor_reference,
+            "estimated_length": b.estimated_length,
+            "status": b.status,
+            "created_at": b.created_at.isoformat() if b.created_at else None
+        }
+    }
+
+@router.get("/scripts")
+async def list_scripts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Script).order_by(Script.created_at.desc()))
+    scripts = result.scalars().all()
+    data = []
+    for s in scripts:
+        data.append({
+            "id": s.id,
+            "brief_id": s.brief_id,
+            "hook": s.hook,
+            "introduction": s.introduction,
+            "sections": s.sections,
+            "cta": s.cta,
+            "status": s.status,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/scripts/{script_id}")
+async def get_script(
+    script_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Script).filter(Script.id == script_id))
+    s = result.scalars().first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Script not found")
+    return {
+        "status": "success",
+        "data": {
+            "id": s.id,
+            "brief_id": s.brief_id,
+            "hook": s.hook,
+            "introduction": s.introduction,
+            "sections": s.sections,
+            "cta": s.cta,
+            "status": s.status,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        }
+    }
+
+@router.get("/storyboards")
+async def list_storyboards(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Storyboard).order_by(Storyboard.created_at.desc()))
+    storyboards = result.scalars().all()
+    data = []
+    for s in storyboards:
+        data.append({
+            "id": s.id,
+            "script_id": s.script_id,
+            "scenes": s.scenes,
+            "status": s.status,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/storyboards/{storyboard_id}")
+async def get_storyboard(
+    storyboard_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Storyboard).filter(Storyboard.id == storyboard_id))
+    s = result.scalars().first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Storyboard not found")
+    return {
+        "status": "success",
+        "data": {
+            "id": s.id,
+            "script_id": s.script_id,
+            "scenes": s.scenes,
+            "status": s.status,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        }
+    }
+
+@router.get("/assets/{storyboard_id}")
+async def get_storyboard_assets(
+    storyboard_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(GeneratedAsset).filter(GeneratedAsset.storyboard_id == storyboard_id))
+    assets = result.scalars().all()
+    data = []
+    for a in assets:
+        data.append({
+            "id": a.id,
+            "storyboard_id": a.storyboard_id,
+            "asset_type": a.asset_type,
+            "provider": a.provider,
+            "url": a.url,
+            "metadata_json": a.metadata_json,
+            "status": a.status
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/videos")
+async def list_videos(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(GeneratedVideo).order_by(GeneratedVideo.created_at.desc()))
+    videos = result.scalars().all()
+    data = []
+    for v in videos:
+        data.append({
+            "id": v.id,
+            "storyboard_id": v.storyboard_id,
+            "url": v.url,
+            "duration": v.duration,
+            "status": v.status,
+            "created_at": v.created_at.isoformat() if v.created_at else None
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/videos/{video_id}")
+async def get_video(
+    video_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(GeneratedVideo).filter(GeneratedVideo.id == video_id))
+    v = result.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return {
+        "status": "success",
+        "data": {
+            "id": v.id,
+            "storyboard_id": v.storyboard_id,
+            "url": v.url,
+            "duration": v.duration,
+            "status": v.status,
+            "created_at": v.created_at.isoformat() if v.created_at else None
+        }
+    }
+
+@router.get("/thumbnails/{video_id}")
+async def get_video_thumbnails(
+    video_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Thumbnail).filter(Thumbnail.video_id == video_id))
+    thumbs = result.scalars().all()
+    data = []
+    for t in thumbs:
+        data.append({
+            "id": t.id,
+            "video_id": t.video_id,
+            "url": t.url,
+            "variant_name": t.variant_name,
+            "ab_test_winner": t.ab_test_winner
+        })
+    return {"status": "success", "data": data}
+
+@router.get("/publish/history/{video_id}")
+async def get_publish_history(
+    video_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(PublishHistory).filter(PublishHistory.video_id == video_id))
+    history = result.scalars().all()
+    data = []
+    for h in history:
+        data.append({
+            "id": h.id,
+            "video_id": h.video_id,
+            "youtube_video_id": h.youtube_video_id,
+            "status": h.status,
+            "scheduled_for": h.scheduled_for.isoformat() if h.scheduled_for else None,
+            "published_at": h.published_at.isoformat() if h.published_at else None
+        })
+    return {"status": "success", "data": data}

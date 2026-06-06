@@ -3,6 +3,54 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import settings
 
+def get_fallback_storyboard(script_data: dict) -> list:
+    hook = script_data.get("hook", "Intro scene")
+    intro = script_data.get("introduction", "Introducing topic")
+    sections = script_data.get("sections", [])
+    cta = script_data.get("cta", "Call to action")
+    
+    scenes = [
+        {
+            "scene": 1,
+            "duration": 5,
+            "narration": hook,
+            "visual_description": "High-energy introductory footage with fast transitions, matching the hook content.",
+            "camera_style": "Fast zoom, dynamic cinematic movement",
+            "asset_requirements": ["A-roll of presenter", "Intro transition animation"]
+        },
+        {
+            "scene": 2,
+            "duration": 10,
+            "narration": intro,
+            "visual_description": "Presenter walking or speaking directly to the camera, explaining the value proposition.",
+            "camera_style": "Medium shot, stable panning",
+            "asset_requirements": ["Main video track", "Subtitles overlay"]
+        }
+    ]
+    
+    scene_idx = 3
+    for s in sections:
+        scenes.append({
+            "scene": scene_idx,
+            "duration": 15,
+            "narration": s.get("content", s.get("body", "")),
+            "visual_description": f"Showing close-up visual details of: {s.get('heading', 'Core topic')}.",
+            "camera_style": "Extreme close-up or steady detail shot",
+            "asset_requirements": ["B-roll footage", "Explaining graphics"]
+        })
+        scene_idx += 1
+        
+    scenes.append({
+        "scene": scene_idx,
+        "duration": 8,
+        "narration": cta,
+        "visual_description": "Presenter pointing to subscribe button or end-card overlay showing recommended videos.",
+        "camera_style": "Wide shot, fading to black",
+        "asset_requirements": ["End-screen card template", "Subscribe button animation"]
+    })
+    
+    return scenes
+
 def generate_storyboard(script_data: dict) -> list:
     llm = ChatGoogleGenerativeAI(api_key=settings.GEMINI_API_KEY, model="gemini-2.5-pro", temperature=0.7)
     
@@ -35,7 +83,10 @@ def generate_storyboard(script_data: dict) -> list:
         if content.startswith("```json"):
             content = content[7:-3]
             
-        return json.loads(content)
+        res = json.loads(content)
+        if not res or not isinstance(res, list):
+            return get_fallback_storyboard(script_data)
+        return res
     except Exception as e:
         print(f"Error generating storyboard: {e}")
-        return []
+        return get_fallback_storyboard(script_data)
