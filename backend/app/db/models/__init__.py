@@ -65,6 +65,8 @@ class AudienceInsight(Base):
     personas = Column(JSON, default=list)
     interests = Column(JSON, default=list)
     pain_points = Column(JSON, default=list)
+    requested_topics = Column(JSON, default=list)
+    content_gaps = Column(JSON, default=list)
 
     channel = relationship("Channel", back_populates="audience_insights")
 

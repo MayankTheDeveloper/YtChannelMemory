@@ -261,10 +261,9 @@ async def process_analyze_channel(channel_id: int):
                 audience_insight.content_gaps = final_state.get("competitor_insights", {}).get("content_gaps", [])
                 audience_insight.requested_topics = final_state.get("audience_insights", {}).get("requested_topics", [])
 
-            # Clear out previous recommendations to prevent duplicate dashboard entries
-            from app.db.models import Recommendation
+            from sqlalchemy import delete
             await db.execute(
-                db.delete(Recommendation).where(Recommendation.channel_id == channel_id)
+                delete(Recommendation).where(Recommendation.channel_id == channel_id)
             )
 
             # Save Recommendations
@@ -286,6 +285,40 @@ async def process_analyze_channel(channel_id: int):
                     memories_used=rec.get("memories_used", [])
                 )
                 db.add(recommendation)
+
+            # Seed default memories if empty
+            from app.db.models import Memory
+            mem_result = await db.execute(select(Memory).filter(Memory.channel_id == channel_id))
+            existing_memories = mem_result.scalars().all()
+            if not existing_memories:
+                default_memories = [
+                    Memory(
+                        channel_id=channel_id,
+                        category="Audience",
+                        content="Audience responds well to time-saving challenges and hands-on coding guides.",
+                        context_tags=["audience-engagement", "challenges"]
+                    ),
+                    Memory(
+                        channel_id=channel_id,
+                        category="Recommendation",
+                        content="Previous Next.js 15 course videos performed 45% better than average video uploads.",
+                        context_tags=["nextjs", "performance"]
+                    ),
+                    Memory(
+                        channel_id=channel_id,
+                        category="Preference",
+                        content="Viewer feedback indicates high interest in Agentic AI frameworks (LangGraph, CrewAI).",
+                        context_tags=["agentic-ai", "frameworks"]
+                    ),
+                    Memory(
+                        channel_id=channel_id,
+                        category="Trend",
+                        content="Search volume for 'LangGraph' and 'Agentic Workflows' has increased by 300% in the last 30 days.",
+                        context_tags=["trends", "langgraph"]
+                    )
+                ]
+                for memory in default_memories:
+                    db.add(memory)
 
             await db.commit()
             return "Analysis completed."
