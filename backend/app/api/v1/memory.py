@@ -40,3 +40,31 @@ async def get_memory_context(
 ):
     context = await memory_service.build_memory_context(db, channel_id)
     return {"context": context}
+
+@router.get("/shorts", response_model=List[MemoryRead])
+async def get_shorts_memories(
+    channel_id: int,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    search_params = MemorySearch(
+        channel_id=channel_id,
+        category="SHORTS_MEMORY",
+        limit=limit
+    )
+    return await memory_service.recall_memories(db, search_params)
+
+@router.get("/long-form", response_model=List[MemoryRead])
+async def get_long_form_memories(
+    channel_id: int,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    search_params = MemorySearch(
+        channel_id=channel_id,
+        category="LONG_FORM_MEMORY",
+        limit=limit
+    )
+    return await memory_service.recall_memories(db, search_params)

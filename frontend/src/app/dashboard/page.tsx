@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Sparkles, RefreshCw, Trash2, ArrowRight, Video, Users, Activity, AlertCircle, FileText, CheckCircle2, ExternalLink } from "lucide-react"
+import { Sparkles, RefreshCw, Trash2, ArrowRight, Video, Users, Activity, AlertCircle, CheckCircle2, ExternalLink, Zap, Clock, TrendingUp } from "lucide-react"
+import Link from 'next/link'
 
 const Youtube = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -21,11 +22,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v
 const AGENT_STEPS = [
   "Ingesting YouTube comments & audience signals...",
   "Audience Agent: Profiling viewer segments & pain points...",
-  "Video Agent: Extracting winning & losing content patterns...",
+  "Shorts Analysis Agent: Extracting hook & pacing patterns...",
+  "Long Form Analysis Agent: Analyzing watch time & topic clusters...",
   "Competitor Agent: Identifying competitor content gaps...",
   "Trend Agent: Computing velocity of emerging topics...",
   "Hindsight Memory: Recalling past strategy iterations...",
-  "Strategy Agent: Formulating high-confidence content briefs...",
+  "Shorts Strategy Agent: Formulating reach optimized brief ideas...",
+  "Long Form Strategy Agent: Formulating watch-time optimized briefs...",
   "Memory Retain: Storing predictions for outcome tracking..."
 ]
 
@@ -64,7 +67,6 @@ export default function DashboardPage() {
       const res = await fetch(`${API_BASE}/import/channel/${id}/dashboard`)
       if (!res.ok) {
         if (res.status === 404) {
-          // Channel not found in db, reset local storage
           localStorage.removeItem("active_channel_id")
           setChannelId(null)
           setData(null)
@@ -95,7 +97,6 @@ export default function DashboardPage() {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     if (stepIntervalRef.current) clearInterval(stepIntervalRef.current)
 
-    // Dynamic fake progress
     setProgressVal(10)
     setAgentStep(0)
 
@@ -152,7 +153,6 @@ export default function DashboardPage() {
       localStorage.setItem("active_channel_id", String(imported.channel_id))
       setChannelId(String(imported.channel_id))
       
-      // Auto trigger analysis on first import to make UX smooth
       await triggerAnalysis(String(imported.channel_id))
     } catch (err: any) {
       setError(err.message || "Could not connect to YouTube channel")
@@ -198,7 +198,6 @@ export default function DashboardPage() {
     )
   }
 
-  // CONNECTION VIEW
   if (!channelId) {
     return (
       <div className="max-w-2xl mx-auto py-12 px-4">
@@ -258,37 +257,10 @@ export default function DashboardPage() {
             </form>
           </CardContent>
         </Card>
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-          <Card className="bg-zinc-900/30 border-zinc-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-zinc-300">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                Hindsight Memory System
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-zinc-400 leading-relaxed">
-              Every content suggestion uses memory loops. The platform remembers previous ideas, audience feedback, and compounding strategy refinements.
-            </CardContent>
-          </Card>
-          <Card className="bg-zinc-900/30 border-zinc-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-zinc-300">
-                <Users className="h-4 w-4 text-blue-500" />
-                Audience Demands
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-zinc-400 leading-relaxed">
-              Reads the comments to trace user interests, friction, and burning questions, ensuring that proposed scripts target actual demand.
-            </CardContent>
-          </Card>
-        </div>
       </div>
     )
   }
 
-  // ANALYZING STATE
   if (analyzing) {
     return (
       <div className="max-w-2xl mx-auto py-16 px-4 text-center space-y-8">
@@ -299,7 +271,7 @@ export default function DashboardPage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-extrabold text-white">LangGraph Pipeline Active</h1>
           <p className="text-zinc-400 text-base max-w-md mx-auto">
-            Autonomous agents are analyzing your YouTube video performance and community feedback comments to synthesize channel intelligence.
+            Autonomous agents are analyzing your Shorts & Long-Form videos, and community comments to synthesize separate content strategies.
           </p>
         </div>
 
@@ -321,13 +293,25 @@ export default function DashboardPage() {
     )
   }
 
-  // FULL DASHBOARD OVERVIEW VIEW
   const channel = data?.channel
   const videos = data?.videos || []
   const analysisStatus = data?.analysis_status || "not_started"
 
+  // Split videos
+  const longFormVideos = videos.filter((v: any) => v.content_type === "LONG_FORM")
+  const shortsVideos = videos.filter((v: any) => v.content_type === "SHORT")
+
+  // Split recommendations
+  const longFormRecs = data?.long_form_recommendations || []
+  const shortsRecs = data?.shorts_recommendations || []
+
+  // Extract insights
+  const longFormInsights = data?.long_form_insights || {}
+  const shortsInsights = data?.shorts_insights || {}
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
           <div className="flex items-center gap-3">
@@ -345,10 +329,10 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <Button 
             onClick={() => triggerAnalysis(channelId)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-2"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-2 animate-shimmer"
           >
             <Sparkles className="h-4 w-4" />
-            Run AI Analysis
+            Run Separate AI Analysis
           </Button>
           <Button 
             variant="outline" 
@@ -368,7 +352,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Overview Metric Cards */}
+      {/* Metrics Row */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -379,20 +363,20 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-white">
               {channel?.subscriber_count ? Number(channel.subscriber_count).toLocaleString() : "0"}
             </div>
-            <p className="text-xs text-zinc-500 mt-1">Live from YouTube API</p>
+            <p className="text-xs text-zinc-500 mt-1">Channel reach status</p>
           </CardContent>
         </Card>
 
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-zinc-400">Videos Ingested</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-400">Videos (Ingested)</CardTitle>
             <Video className="h-4 w-4 text-zinc-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
-              {videos.length || channel?.video_count || "0"}
+              {longFormVideos.length} Long / {shortsVideos.length} Shorts
             </div>
-            <p className="text-xs text-zinc-500 mt-1">Recent uploads analyzed</p>
+            <p className="text-xs text-zinc-500 mt-1">Split ecosystems</p>
           </CardContent>
         </Card>
 
@@ -405,13 +389,13 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-emerald-400">
               {channel?.health_score ? `${Math.round(channel.health_score)}/100` : "N/A"}
             </div>
-            <p className="text-xs text-zinc-500 mt-1">Based on engagement signals</p>
+            <p className="text-xs text-zinc-500 mt-1">Weighted engagement</p>
           </CardContent>
         </Card>
 
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-zinc-400">Analysis Status</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-400">AI Intelligence</CardTitle>
             {analysisStatus === "completed" ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
             ) : (
@@ -422,80 +406,200 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-white capitalize">
               {analysisStatus.replace("_", " ")}
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              {analysisStatus === "completed" ? "Insights updated" : "Run analysis to generate tips"}
-            </p>
+            <p className="text-xs text-zinc-500 mt-1">Separate analysis state</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Videos List Grid */}
-      <div className="grid gap-6 grid-cols-1">
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white">Recent Videos Ingested</CardTitle>
-            <CardDescription className="text-zinc-400">
-              Videos fetched from the public uploads feed of your channel.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {videos.length === 0 ? (
-              <p className="text-zinc-500 text-sm text-center py-6">No videos imported yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-zinc-300">
-                  <thead className="bg-zinc-950 text-xs text-zinc-400 uppercase">
-                    <tr>
-                      <th className="px-4 py-3">Video</th>
-                      <th className="px-4 py-3">Views</th>
-                      <th className="px-4 py-3">Likes</th>
-                      <th className="px-4 py-3">Link</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {videos.slice(0, 8).map((vid: any) => (
-                      <tr key={vid.id} className="hover:bg-zinc-800/40 transition-colors">
-                        <td className="px-4 py-3 font-medium text-white flex items-center gap-3">
-                          {vid.thumbnail_url ? (
-                            <img 
-                              src={vid.thumbnail_url} 
-                              alt="" 
-                              className="w-16 h-9 rounded object-cover border border-zinc-700 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-16 h-9 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                              <Video className="h-4 w-4 text-zinc-500" />
-                            </div>
-                          )}
-                          <span className="truncate max-w-md" title={vid.title}>
-                            {vid.title}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-semibold">
-                          {Number(vid.view_count).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-zinc-400">
-                          {Number(vid.like_count).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <a 
-                            href={`https://youtube.com/watch?v=${vid.youtube_video_id}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-zinc-400 hover:text-white flex items-center gap-1 transition-colors"
-                          >
-                            Watch
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {/* Two Columns: Long Form Insights vs Shorts Insights */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        
+        {/* LONG FORM INSIGHTS COLUMN */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-zinc-800">
+            <Clock className="h-6 w-6 text-indigo-400" />
+            <h2 className="text-2xl font-bold text-white">Long Form Insights</h2>
+          </div>
+
+          {/* Long Form Videos */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-white text-base">Ingested Videos ({longFormVideos.length})</CardTitle>
+              <CardDescription className="text-zinc-500">Long-form video uploads analyzed.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {longFormVideos.length === 0 ? (
+                <p className="text-zinc-500 text-sm py-4 text-center">No long-form videos imported.</p>
+              ) : (
+                <div className="space-y-2">
+                  {longFormVideos.slice(0, 4).map((vid: any) => (
+                    <div key={vid.id} className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-zinc-800/40 hover:bg-zinc-800/40 transition-colors">
+                      <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <span className="text-white text-sm font-medium truncate max-w-[240px]">{vid.title}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-semibold text-zinc-400 shrink-0">
+                        <span>{Number(vid.view_count).toLocaleString()} views</span>
+                        <a href={`https://youtube.com/watch?v=${vid.youtube_video_id}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Long Form Patterns */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-indigo-400 text-base">Long-Form Strategy Patterns</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">Topic Clusters:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {(longFormInsights.topic_clusters || ["AI Tutorials", "SaaS Case Studies"]).map((c: string, idx: number) => (
+                    <Badge key={idx} variant="outline" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/5">
+                      {c}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1">Winning Formats:</h4>
+                <ul className="list-disc pl-5 text-zinc-400 space-y-1">
+                  {(longFormInsights.winning_patterns || ["Case-study based titles", "Thumbnail includes a recognizable brand logo"]).map((p: string, idx: number) => (
+                    <li key={idx}>{p}</li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Long Form Recommendations */}
+          <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-indigo-500">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white text-base">Top Long-Form Recommendations</CardTitle>
+                <Link href="/dashboard/recommendations" className="text-xs text-indigo-400 hover:underline flex items-center gap-1">
+                  View All <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {longFormRecs.length === 0 ? (
+                <p className="text-zinc-500 text-sm py-4 text-center">Run analysis to generate recommendations.</p>
+              ) : (
+                <div className="space-y-3">
+                  {longFormRecs.slice(0, 3).map((rec: any, idx: number) => (
+                    <div key={rec.id || idx} className="p-3 bg-zinc-950 rounded border border-zinc-850 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-white max-w-[80%]">{rec.title}</h4>
+                        <Badge className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{rec.confidence_score}%</Badge>
+                      </div>
+                      <p className="text-xs text-zinc-400 line-clamp-2">{rec.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* SHORTS INSIGHTS COLUMN */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-zinc-800">
+            <Zap className="h-6 w-6 text-amber-400" />
+            <h2 className="text-2xl font-bold text-white">Shorts Insights</h2>
+          </div>
+
+          {/* Shorts Videos */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-white text-base">Ingested Shorts ({shortsVideos.length})</CardTitle>
+              <CardDescription className="text-zinc-500">Shorts uploads analyzed.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {shortsVideos.length === 0 ? (
+                <p className="text-zinc-500 text-sm py-4 text-center">No Shorts imported.</p>
+              ) : (
+                <div className="space-y-2">
+                  {shortsVideos.slice(0, 4).map((vid: any) => (
+                    <div key={vid.id} className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-zinc-800/40 hover:bg-zinc-800/40 transition-colors">
+                      <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <span className="text-white text-sm font-medium truncate max-w-[240px]">{vid.title}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-semibold text-zinc-400 shrink-0">
+                        <span>{Number(vid.view_count).toLocaleString()} views</span>
+                        <a href={`https://youtube.com/watch?v=${vid.youtube_video_id}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Shorts Patterns */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-amber-400 text-base">Shorts Strategy Patterns</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-zinc-950 p-2 rounded border border-zinc-800/50">
+                  <span className="text-zinc-500 block">Avg Duration:</span>
+                  <span className="text-white font-bold text-sm">{shortsInsights.average_duration_seconds || 35}s</span>
+                </div>
+                <div className="bg-zinc-950 p-2 rounded border border-zinc-800/50">
+                  <span className="text-zinc-500 block">Hook Strategy:</span>
+                  <span className="text-white font-bold text-sm">Visual Action</span>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1">Hook Patterns:</h4>
+                <ul className="list-disc pl-5 text-zinc-400 space-y-1">
+                  {(shortsInsights.hook_patterns || ["Did you know that...?", "Stop doing this wrong!"]).map((h: string, idx: number) => (
+                    <li key={idx}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Shorts Recommendations */}
+          <Card className="bg-zinc-900 border-zinc-800 border-l-4 border-l-amber-500">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white text-base">Top Shorts Recommendations</CardTitle>
+                <Link href="/dashboard/recommendations" className="text-xs text-amber-400 hover:underline flex items-center gap-1">
+                  View All <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {shortsRecs.length === 0 ? (
+                <p className="text-zinc-500 text-sm py-4 text-center">Run analysis to generate recommendations.</p>
+              ) : (
+                <div className="space-y-3">
+                  {shortsRecs.slice(0, 3).map((rec: any, idx: number) => (
+                    <div key={rec.id || idx} className="p-3 bg-zinc-950 rounded border border-zinc-850 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h4 className="text-sm font-bold text-white max-w-[80%]">{rec.title}</h4>
+                        <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20">{rec.confidence_score}%</Badge>
+                      </div>
+                      <p className="text-xs text-zinc-400 line-clamp-2">{rec.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
       </div>
     </div>
   )

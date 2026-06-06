@@ -81,3 +81,37 @@ async def get_video_insights(
     if run and run.output:
         return run.output.get("video_insights", {})
     return {}
+
+@router.get("/shorts")
+async def get_shorts_insights(
+    channel_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Fetch from the latest AgentRun output
+    result = await db.execute(
+        select(AgentRun)
+        .filter(AgentRun.user_id == current_user.id, AgentRun.agent_type == "channel_analysis", AgentRun.status == "completed")
+        .order_by(desc(AgentRun.id))
+    )
+    run = result.scalars().first()
+    if run and run.output:
+        return run.output.get("shorts_insights", {})
+    return {}
+
+@router.get("/long-form")
+async def get_long_form_insights(
+    channel_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Fetch from the latest AgentRun output
+    result = await db.execute(
+        select(AgentRun)
+        .filter(AgentRun.user_id == current_user.id, AgentRun.agent_type == "channel_analysis", AgentRun.status == "completed")
+        .order_by(desc(AgentRun.id))
+    )
+    run = result.scalars().first()
+    if run and run.output:
+        return run.output.get("long_form_insights", {})
+    return {}

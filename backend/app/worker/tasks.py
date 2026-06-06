@@ -6,6 +6,7 @@ from app.db.session import SessionLocal
 from app.db.models import User, Channel, Video, Comment
 from sqlalchemy import select
 from dateutil.parser import isoparse
+from app.core.utils import parse_iso8601_duration
 
 async def process_sync_channel(user_id: int):
     async with SessionLocal() as db:
@@ -59,6 +60,9 @@ async def process_sync_videos(user_id: int, db_channel_id: int, yt_channel_id: s
             video = result.scalars().first()
             
             published_at = isoparse(v_data["published_at"])
+            duration_str = v_data.get("duration", "")
+            seconds = parse_iso8601_duration(duration_str)
+            content_type = "SHORT" if (seconds > 0 and seconds <= 60) else "LONG_FORM"
             
             if not video:
                 video = Video(
@@ -68,7 +72,8 @@ async def process_sync_videos(user_id: int, db_channel_id: int, yt_channel_id: s
                     published_at=published_at,
                     view_count=v_data["view_count"],
                     like_count=v_data["like_count"],
-                    thumbnail_url=v_data["thumbnail_url"]
+                    thumbnail_url=v_data["thumbnail_url"],
+                    content_type=content_type
                 )
                 db.add(video)
                 await db.commit()
@@ -76,6 +81,7 @@ async def process_sync_videos(user_id: int, db_channel_id: int, yt_channel_id: s
             else:
                 video.view_count = v_data["view_count"]
                 video.like_count = v_data["like_count"]
+                video.content_type = content_type
                 await db.commit()
                 
             # Spawn comment sync

@@ -67,7 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api.v1 import auth, channels, insights, competitors, trends, reports, creation, memory, import_channel
+from app.api.v1 import auth, channels, insights, competitors, trends, reports, creation, memory, import_channel, recommendations
 
 @app.get("/")
 def read_root():
@@ -122,3 +122,4 @@ app.include_router(creation.router, prefix="/api/v1/creation", tags=["creation"]
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"])
 app.include_router(import_channel.router, prefix="/api/v1/import", tags=["import"])
+app.include_router(recommendations.router, prefix="/api/v1/recommendations", tags=["recommendations"])

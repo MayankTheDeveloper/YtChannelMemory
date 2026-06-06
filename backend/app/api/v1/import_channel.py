@@ -6,11 +6,14 @@ from fastapi import Depends
 from pydantic import BaseModel
 from typing import Optional
 from dateutil.parser import isoparse
+import random
+from datetime import datetime, timedelta
 
 from app.api.deps import get_db
 from app.db.models import Channel, Video, Comment, AudienceInsight, Recommendation, Memory, AgentRun
 from app.services.youtube_public import YouTubePublicService
 from app.worker.analyze_tasks import analyze_channel
+from app.core.utils import parse_iso8601_duration
 
 router = APIRouter()
 
@@ -47,7 +50,6 @@ def get_fallback_channel_data(channel_url: str):
     video_count = 1600 if "mkbhd" in handle.lower() else 850 if "fireship" in handle.lower() else 120
     description = f"Welcome to {name}! Mined with Hindsight Memory System."
 
-    # Return structure
     channel_info = {
         "youtube_channel_id": yt_channel_id,
         "title": name,
@@ -56,48 +58,41 @@ def get_fallback_channel_data(channel_url: str):
         "video_count": video_count
     }
 
-    # Generate mock videos
+    # Success Criteria: Generate 18 Shorts (under 60s) and 2 Long-form videos (over 60s)
     videos_data = []
-    video_titles = []
-    if "mkbhd" in handle.lower():
-        video_titles = [
-            "Reviewing the Futuristic AI Pin",
-            "This Phone is Actually Changing Everything...",
-            "Why I Switched Back to the iPhone",
-            "My $50,000 Studio Tour",
-            "What's in my Tech Bag?"
-        ]
-    elif "fireship" in handle.lower():
-        video_titles = [
-            "Next.js 15 in 100 Seconds",
-            "Is Python Dead in 2026?",
-            "AI Agent Frameworks: LangGraph vs CrewAI",
-            "The SaaS stack I would use today",
-            "Why everybody is leaving React"
-        ]
-    else:
-        video_titles = [
-            f"How to build a compounding strategy for {name}",
-            f"Why I started {name} in 2026",
-            "The ultimate guide to creator growth",
-            "Outcome tracking and AI Memory",
-            "How LangGraph workflow works"
-        ]
-
-    import random
-    from datetime import datetime, timedelta
     
-    for i, title in enumerate(video_titles):
-        v_id = f"mock_video_{handle}_{i}"
-        view_c = random.randint(10000, 500000)
-        like_c = int(view_c * 0.05)
-        comment_c = int(view_c * 0.01)
-        pub_at = (datetime.now() - timedelta(days=i*5)).isoformat() + "Z"
+    # 18 Shorts
+    for i in range(18):
+        v_id = f"mock_short_{handle}_{i}"
+        view_c = random.randint(10000, 300000)
+        like_c = int(view_c * 0.08)
+        comment_c = int(view_c * 0.02)
+        pub_at = (datetime.now() - timedelta(days=i)).isoformat() + "Z"
         videos_data.append({
             "youtube_video_id": v_id,
-            "title": title,
-            "description": f"Detailed description for {title}",
+            "title": f"Short: {name} Idea #{i+1} on AI & Dev",
+            "description": f"Quick content explanation for #{i+1}",
             "thumbnail_url": "",
+            "duration": "PT30S", # 30 seconds
+            "published_at": pub_at,
+            "view_count": view_c,
+            "like_count": like_c,
+            "comment_count": comment_c
+        })
+        
+    # 2 Long-form videos
+    for i in range(2):
+        v_id = f"mock_long_{handle}_{i}"
+        view_c = random.randint(50000, 800000)
+        like_c = int(view_c * 0.04)
+        comment_c = int(view_c * 0.01)
+        pub_at = (datetime.now() - timedelta(days=i*10 + 20)).isoformat() + "Z"
+        videos_data.append({
+            "youtube_video_id": v_id,
+            "title": f"Deep Dive: Building SaaS & LangGraph with {name} (Tutorial #{i+1})",
+            "description": f"In-depth long-form video discussing design and execution.",
+            "thumbnail_url": "",
+            "duration": "PT15M30S", # 15 mins 30 seconds
             "published_at": pub_at,
             "view_count": view_c,
             "like_count": like_c,
@@ -188,7 +183,6 @@ async def import_channel(
         await db.commit()
 
     if has_api_key:
-        # Fetch and store videos from YouTube API
         videos_data = yt.fetch_recent_videos(yt_channel_id, max_results=30)
     else:
         videos_data = mock_videos
@@ -201,6 +195,9 @@ async def import_channel(
         existing_video = result.scalars().first()
 
         published_at = isoparse(v_data["published_at"])
+        duration_str = v_data.get("duration", "")
+        seconds = parse_iso8601_duration(duration_str)
+        content_type = "SHORT" if (seconds > 0 and seconds <= 60) else "LONG_FORM"
 
         if not existing_video:
             video = Video(
@@ -210,7 +207,8 @@ async def import_channel(
                 published_at=published_at,
                 view_count=v_data["view_count"],
                 like_count=v_data["like_count"],
-                thumbnail_url=v_data["thumbnail_url"]
+                thumbnail_url=v_data["thumbnail_url"],
+                content_type=content_type
             )
             db.add(video)
             await db.commit()
@@ -220,6 +218,7 @@ async def import_channel(
             video = existing_video
             video.view_count = v_data["view_count"]
             video.like_count = v_data["like_count"]
+            video.content_type = content_type
             await db.commit()
 
         # Fetch comments for this video (limit to top 5 videos to save API quota)
@@ -268,7 +267,6 @@ async def import_channel(
         comments_imported=comments_imported
     )
 
-
 @router.post("/channel/{channel_id}/analyze")
 async def trigger_analysis(
     channel_id: int,
@@ -276,7 +274,6 @@ async def trigger_analysis(
 ):
     """
     Trigger the full LangGraph AI analysis pipeline for the imported channel.
-    This runs: Comments → Audience → Video → Competitors → Trends → Memory Recall → Recommendations → Memory Retain
     """
     result = await db.execute(select(Channel).filter(Channel.id == channel_id))
     channel = result.scalars().first()
@@ -285,7 +282,6 @@ async def trigger_analysis(
 
     task = analyze_channel.delay(channel_id)
     return {"message": "Analysis pipeline started", "task_id": task.id, "channel_id": channel_id}
-
 
 @router.get("/channel/{channel_id}/dashboard")
 async def get_channel_dashboard(
@@ -316,6 +312,8 @@ async def get_channel_dashboard(
         select(Recommendation).filter(Recommendation.channel_id == channel_id).order_by(desc(Recommendation.confidence_score))
     )
     recommendations = result.scalars().all()
+    shorts_recommendations = [r for r in recommendations if r.content_type == "SHORT"]
+    long_form_recommendations = [r for r in recommendations if r.content_type == "LONG_FORM"]
 
     # Memories
     result = await db.execute(
@@ -349,6 +347,7 @@ async def get_channel_dashboard(
                 "like_count": v.like_count,
                 "thumbnail_url": v.thumbnail_url,
                 "published_at": str(v.published_at) if v.published_at else None,
+                "content_type": v.content_type,
             }
             for v in videos
         ],
@@ -373,8 +372,45 @@ async def get_channel_dashboard(
                 "memories_used": r.memories_used or [],
                 "related_trends": r.related_trends or [],
                 "status": r.status,
+                "content_type": r.content_type,
             }
             for r in recommendations
+        ],
+        "shorts_recommendations": [
+            {
+                "id": r.id,
+                "title": r.suggested_title,
+                "confidence_score": r.confidence_score,
+                "audience_score": r.audience_score,
+                "historical_score": r.historical_score,
+                "trend_score": r.trend_score,
+                "competition_score": r.competition_score,
+                "reasoning": r.reasoning,
+                "evidence": r.evidence or [],
+                "memories_used": r.memories_used or [],
+                "related_trends": r.related_trends or [],
+                "status": r.status,
+                "content_type": r.content_type,
+            }
+            for r in shorts_recommendations
+        ],
+        "long_form_recommendations": [
+            {
+                "id": r.id,
+                "title": r.suggested_title,
+                "confidence_score": r.confidence_score,
+                "audience_score": r.audience_score,
+                "historical_score": r.historical_score,
+                "trend_score": r.trend_score,
+                "competition_score": r.competition_score,
+                "reasoning": r.reasoning,
+                "evidence": r.evidence or [],
+                "memories_used": r.memories_used or [],
+                "related_trends": r.related_trends or [],
+                "status": r.status,
+                "content_type": r.content_type,
+            }
+            for r in long_form_recommendations
         ],
         "memories": [
             {
@@ -389,4 +425,6 @@ async def get_channel_dashboard(
         ],
         "analysis_status": latest_run.status if latest_run else "not_started",
         "video_insights": latest_run.output.get("video_insights", {}) if latest_run and latest_run.output else {},
+        "shorts_insights": latest_run.output.get("shorts_insights", {}) if latest_run and latest_run.output else {},
+        "long_form_insights": latest_run.output.get("long_form_insights", {}) if latest_run and latest_run.output else {},
     }

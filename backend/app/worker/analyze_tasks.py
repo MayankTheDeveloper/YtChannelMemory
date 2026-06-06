@@ -1,46 +1,12 @@
 import asyncio
 from app.worker.celery_app import celery_app
 from app.db.session import SessionLocal
-from app.db.models import Channel, Video, Comment, AudienceInsight, Recommendation, AgentRun
-from sqlalchemy import select
+from app.db.models import Channel, Video, Comment, AudienceInsight, Recommendation, AgentRun, Memory
+from sqlalchemy import select, desc, delete
 from app.langgraph.workflow import app_workflow
 import json
+from datetime import datetime, timezone
 
-async def process_analyze_channel(channel_id: int):
-    async with SessionLocal() as db:
-        result = await db.execute(select(Channel).filter(Channel.id == channel_id))
-        channel = result.scalars().first()
-        if not channel:
-            return "Channel not found"
-            
-        # Fetch raw data
-        videos_result = await db.execute(select(Video).filter(Video.channel_id == channel_id))
-        videos = videos_result.scalars().all()
-        
-        video_ids = [v.id for v in videos]
-        comments = []
-        if video_ids:
-            comments_result = await db.execute(select(Comment).filter(Comment.video_id.in_(video_ids)))
-            comments = comments_result.scalars().all()
-            
-        video_data = [{"title": v.title, "view_count": v.view_count, "like_count": v.like_count} for v in videos]
-        comment_data = [{"text": c.text, "author": c.author} for c in comments]
-
-        initial_state = {
-            "channel_id": channel_id,
-            "user_id": channel.user_id,
-            "raw_comments": comment_data,
-            "raw_videos": video_data,
-            "raw_competitors": [], # MVP: Fetch from Competitor table
-            "raw_trends": [], # MVP: Fetch from Trend table
-            "comment_insights": {},
-            "audience_insights": {},
-            "video_insights": {},
-            "competitor_insights": {},
-            "trend_insights": {},
-            "recommendations": []
-        }
-        
 def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
     # Determine general topic
     topic = "Tech & Software Development"
@@ -55,138 +21,107 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
     elif any(k in theme.lower() for k in ["science", "hacker", "experiment", "stunt", "challenge", "diy", "creative", "toy", "play", "game", "mr. indian hacker", "mr.indian hacker"]):
         topic = "Experiments, Stunts & Creative Challenges"
 
-    # Personas, interests, pain points, requested topics, content gaps, recommendations based on topic
+    # Define 10 Shorts Recommendations and 10 Long Form Recommendations based on topic
+    shorts_recs = []
+    long_form_recs = []
+
     if topic == "Cooking & Culinary Arts":
         personas = ["Home Cooks looking for quick meals", "Foodies craving restaurant-style dishes", "Beginners learning kitchen basics"]
         interests = ["30-minute recipes", "Kitchen tool reviews", "Baking tutorials", "Meal prepping"]
         pain_points = ["Lack of time for weekday dinners", "Complicated recipe steps", "Ingredient availability", "Cooking healthy on a budget"]
         requested_topics = ["15-minute healthy dinners", "How to knife skills for beginners", "Sourdough bread starter guide"]
         content_gaps = ["Lack of quick vegetarian meal prep videos", "Fewer guides on high-protein budget desserts"]
-        recs = [
-            {
-                "title": "I Made 5 Healthy Dinners in 15 Minutes (Meal Prep Challenge)",
-                "confidence_score": 94,
-                "audience_score": 96,
-                "historical_score": 90,
-                "trend_score": 95,
-                "competition_score": 95,
-                "reasoning": [
-                    "Directly addresses 'lack of time' pain point for weekday dinners",
-                    "Strong trend in quick meal prep video queries",
-                    "Exploits competitor gap in vegetarian/healthy options"
-                ],
-                "evidence": ["High search velocity for '15 minute meals'", "Requested by multiple viewers in comments"],
-                "memories_used": ["Audience responds well to time-saving challenges", "Previous high engagement on meal prep tips"],
-                "related_trends": ["Meal Prep", "Healthy Eating"],
-                "related_videos": [],
-                "related_comments": ["Need more quick dinner ideas!"],
-            },
-            {
-                "title": "Kitchen Knife Skills: 3 Basic Cuts Every Cook Must Know",
-                "confidence_score": 89,
-                "audience_score": 90,
-                "historical_score": 85,
-                "trend_score": 88,
-                "competition_score": 93,
-                "reasoning": [
-                    "Great evergreen content for beginners learning kitchen basics",
-                    "Highly requested skill reference"
-                ],
-                "evidence": ["Steady search volume for 'how to cut vegetables'", "Commenters asking about knife safety"],
-                "memories_used": ["Evergreen beginner content has higher long-term views"],
-                "related_trends": ["Kitchen Basics"],
-                "related_videos": [],
-                "related_comments": ["My dicing is so slow, any advice?"],
-            }
-        ]
+        
+        for i in range(10):
+            shorts_recs.append({
+                "title": f"Short: Quick Culinary Hack #{i+1} - Knife Skill Trick",
+                "confidence_score": 90 - i,
+                "audience_score": 92 - i,
+                "historical_score": 88 - i,
+                "trend_score": 91 - i,
+                "competition_score": 89 - i,
+                "reasoning": [f"Leverages rapid pacing for culinary hacks", "High search velocity for cooking tricks"],
+                "evidence": ["Quick-cut cooking shorts see 3x average completion rate"],
+                "memories_used": ["Quick recipe Shorts (under 30s) perform well."],
+                "related_trends": ["Short Dessert Recipes"]
+            })
+            long_form_recs.append({
+                "title": f"Deep Dive: How to Master French Sauces (Tutorial #{i+1})",
+                "confidence_score": 95 - i,
+                "audience_score": 96 - i,
+                "historical_score": 94 - i,
+                "trend_score": 95 - i,
+                "competition_score": 95 - i,
+                "reasoning": ["Evergreen masterclass addressing cooking basics", "High retention on step-by-step guides"],
+                "evidence": ["Searches for mother sauces up 20%"],
+                "memories_used": ["Detailed dinner prep tutorials perform well."],
+                "related_trends": ["Classic French Cooking"]
+            })
     elif topic == "Experiments, Stunts & Creative Challenges":
-        personas = ["Young Science Enthusiasts", "Adventure & Stunt Seekers", "DIY Experiment Hobbyists", "Action & Modification Lovers"]
-        interests = ["Large-scale chemical reactions", "Engine & vehicle modifications", "Extreme challenge stunts", "Liquid nitrogen experiments"]
-        pain_points = ["Safety of replicating simple experiments", "Cost of materials for big stunts", "Understanding the physics/chemistry behind reactions", "Finding reliable tutorial instructions"]
-        requested_topics = ["Running a bike engine on pure hydrogen", "Liquid nitrogen vs lava in a giant pool", "Making a giant solar balloon", "Crushing rare items with a hydraulic press"]
-        content_gaps = ["Safety guides for chemical reactions", "High frame-rate slow-motion stunt breakdowns", "Interactive community-driven experiment votes"]
-        recs = [
-            {
-                "title": "Running a 150cc Bike Engine on Pure Hydrogen Gas (Will It Explode?)",
-                "confidence_score": 96,
-                "audience_score": 98,
-                "historical_score": 92,
-                "trend_score": 97,
-                "competition_score": 97,
-                "reasoning": [
-                    "Directly addresses high interest in vehicle modifications and alternative energy",
-                    "Extremely requested by viewers in recent comments",
-                    "Provides high visual impact and suspenseful retention value"
-                ],
-                "evidence": ["Commenters requesting hydrogen/water fuel setups", "High search velocity for DIY alternative engine modifications"],
-                "memories_used": ["Audience engages highly with gas/fuel experiments", "Previous vehicle modification videos achieved 3x average retention"],
-                "related_trends": ["Alternative Fuels", "Extreme Bike Modifications"],
-                "related_videos": [],
-                "related_comments": ["Run a bike on hydrogen next please!"],
-            },
-            {
-                "title": "Giant 500-Gallon Liquid Nitrogen vs Boiling Water Pool Experiment",
-                "confidence_score": 92,
-                "audience_score": 94,
-                "historical_score": 88,
-                "trend_score": 95,
-                "competition_score": 91,
-                "reasoning": [
-                    "Capitalizes on high-visual-impact chemical/physical reaction trends",
-                    "Broad entertainment appeal with educational science explanations",
-                    "Fills a content gap for large-scale stunts with slow-motion visual breakdowns"
-                ],
-                "evidence": ["Search queries for liquid nitrogen reactions rising", "Commenters asking for bigger cloud/explosion scale"],
-                "memories_used": ["High-energy visual intros sustain high audience retention", "Stunt videos are highly viral/evergreen"],
-                "related_trends": ["Liquid Nitrogen", "Extreme Physical Reactions"],
-                "related_videos": [],
-                "related_comments": ["Please do a massive nitrogen explosion cloud!"],
-            }
-        ]
-    else:
+        personas = ["Young Science Enthusiasts", "Adventure & Stunt Seekers", "DIY Experiment Hobbyists"]
+        interests = ["Large-scale chemical reactions", "Engine modifications", "Extreme challenge stunts"]
+        pain_points = ["Safety of replicating experiments", "Cost of materials for big stunts"]
+        requested_topics = ["Running a bike engine on pure hydrogen", "Liquid nitrogen vs lava pool"]
+        content_gaps = ["Safety guides for chemical reactions", "High frame-rate slow-motion stunt breakdowns"]
+        
+        for i in range(10):
+            shorts_recs.append({
+                "title": f"Short: Crazy Dry Ice Hack #{i+1} (Do Not Try At Home)",
+                "confidence_score": 92 - i,
+                "audience_score": 94 - i,
+                "historical_score": 90 - i,
+                "trend_score": 93 - i,
+                "competition_score": 91 - i,
+                "reasoning": ["Highly visual and suspenseful retention value in 15 seconds", "Fast hook in the first 2 seconds"],
+                "evidence": ["Fast-paced dry ice videos generate high share rate"],
+                "memories_used": ["Fast-paced visual chemistry explosion Shorts perform well."],
+                "related_trends": ["Science Hacks"]
+            })
+            long_form_recs.append({
+                "title": f"Deep Dive: Building a Hydrogen-Powered Vehicle from Scratch (Ep. #{i+1})",
+                "confidence_score": 96 - i,
+                "audience_score": 98 - i,
+                "historical_score": 92 - i,
+                "trend_score": 97 - i,
+                "competition_score": 97 - i,
+                "reasoning": ["Directly addresses high interest in vehicle modifications and alternative energy", "懸念-filled retention value"],
+                "evidence": ["Commenters requesting hydrogen setups"],
+                "memories_used": ["Hydrogen engine modification challenges generate high retention."],
+                "related_trends": ["Alternative Fuels"]
+            })
+    else: # Tech
         personas = ["Aspiring Developers", "Productivity Seekers", "Tech Enthusiasts", "AI Builders"]
         interests = ["Next.js & React", "AI Tools & APIs", "Software Architecture", "DevOps & Cloud"]
-        pain_points = ["Stuck in tutorial hell", "Keeping up with rapid framework updates", "Debugging complex async state", "Scaling serverless apps"]
-        requested_topics = ["Next.js 15 crash course", "LangGraph agents from scratch", "Deploying SaaS on AWS", "AI voice assistant tutorial"]
+        pain_points = ["Stuck in tutorial hell", "Keeping up with rapid framework updates", "Debugging complex async state"]
+        requested_topics = ["Next.js 15 crash course", "LangGraph agents from scratch", "Deploying SaaS on AWS"]
         content_gaps = ["Lack of end-to-end LangGraph tutorial with DB persistence", "Fewer real-world Next.js 15 production showcases"]
-        recs = [
-            {
-                "title": "How I Automated My YouTube Channel with LangGraph Agents",
-                "confidence_score": 96,
-                "audience_score": 98,
-                "historical_score": 92,
-                "trend_score": 97,
-                "competition_score": 97,
-                "reasoning": [
-                    "Directly addresses top requested topic: 'LangGraph for beginners'",
-                    "Leverages winning pattern: 'Case-study based titles'",
-                    "Matches audience interest in AI Tools and Software Engineering"
-                ],
-                "evidence": ["LangGraph search volume up 300%", "Comments requesting practical AI workflow code"],
-                "memories_used": ["Audience requested automation repeatedly", "Past tutorial succeeded"],
-                "related_trends": ["Agentic AI", "LangGraph"],
-                "related_videos": [],
-                "related_comments": ["Would love to see an agent workflow!"],
-            },
-            {
-                "title": "Next.js 15: The Ultimate Production Guide (Crash Course)",
-                "confidence_score": 91,
-                "audience_score": 92,
-                "historical_score": 88,
-                "trend_score": 94,
-                "competition_score": 90,
-                "reasoning": [
-                    "Addresses high frequency pain point: 'Keeping up with new tech'",
-                    "Previous Next.js courses performed 45% better than average videos"
-                ],
-                "evidence": ["High search volume for 'Next.js 15 App Router'", "Commenters asking about server components"],
-                "memories_used": ["Evergreen Next.js guides yield steady traffic"],
-                "related_trends": ["Next.js 15", "React 19"],
-                "related_videos": [],
-                "related_comments": ["When is Next 15 tutorial coming?"],
-            }
-        ]
         
+        for i in range(10):
+            shorts_recs.append({
+                "title": f"Short: VS Code Shortcut #{i+1} That Feels Like Magic",
+                "confidence_score": 91 - i,
+                "audience_score": 93 - i,
+                "historical_score": 89 - i,
+                "trend_score": 92 - i,
+                "competition_score": 90 - i,
+                "reasoning": ["Great productivity hack for developers", "Highly shareable short concept"],
+                "evidence": ["Searches for developer shortcuts are up 40%"],
+                "memories_used": ["AI News Shorts perform well."],
+                "related_trends": ["Developer Productivity"]
+            })
+            long_form_recs.append({
+                "title": f"Deep Dive: Building Enterprise AI Agents with LangGraph (Tutorial #{i+1})",
+                "confidence_score": 96 - i,
+                "audience_score": 98 - i,
+                "historical_score": 92 - i,
+                "trend_score": 97 - i,
+                "competition_score": 97 - i,
+                "reasoning": ["Directly addresses requested topic: LangGraph for beginners", "Leverages case-study based titles"],
+                "evidence": ["LangGraph search volume up 300%"],
+                "memories_used": ["AI Tutorials perform well."],
+                "related_trends": ["Agentic AI"]
+            })
+
     return {
         "channel_id": channel_id,
         "user_id": user_id,
@@ -194,7 +129,7 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
             "top_requests": requested_topics,
             "top_questions": ["How does X work?", "Can you share the code?"],
             "sentiment_distribution": {"positive": 0.6, "neutral": 0.3, "negative": 0.1},
-            "common_themes": ["Learning frameworks", "Building SaaS"] if topic == "Tech & Software Development" else ["Science & fun", "Cool stunts"]
+            "common_themes": ["Learning frameworks", "Building SaaS"]
         },
         "audience_insights": {
             "personas": personas,
@@ -202,15 +137,27 @@ def get_fallback_analysis_state(channel_id: int, user_id: int, theme: str):
             "pain_points": pain_points,
             "requested_topics": requested_topics
         },
-        "video_insights": {
-            "winning_patterns": ["High-energy intros (< 5s)", "Case-study based titles", "Thumbnail includes a recognizable brand logo"] if topic == "Tech & Software Development" else ["Explosive hook in first 3s", "Bold colorful thumbnails", "Fast cuts under 2s"],
-            "losing_patterns": ["Overly technical jargon in the first minute", "Long unbroken talking head segments", "Vague titles"]
+        "shorts_insights": {
+            "winning_patterns": ["High pacing under 30s", "Bold captions in center", "Hook in first 2s"],
+            "losing_patterns": ["Slow transitions", "Silent intros", "Lack of text overlay"],
+            "average_duration_seconds": 35,
+            "hook_patterns": ["Did you know that...?", "Stop doing this wrong!"],
+            "viral_topics": ["Quick hacks", "Mistakes to avoid"],
+            "engagement_patterns": ["Comment questions boost shares by 40%"]
+        },
+        "long_form_insights": {
+            "winning_patterns": ["Case-study based titles", "Thumbnail includes recognizable logo", "Hook in first 5s"],
+            "losing_patterns": ["Long unbroken talking head segments", "Overly technical jargon in first min"],
+            "topic_clusters": ["AI Agents", "Next.js App Router"],
+            "title_patterns": ["How I...", "The ultimate guide to..."],
+            "thumbnail_patterns": ["High-contrast split image", "Big bold title text"]
         },
         "competitor_insights": {
             "content_gaps": content_gaps
         },
         "trend_insights": {},
-        "recommendations": recs
+        "shorts_recommendations": shorts_recs,
+        "long_form_recommendations": long_form_recs
     }
 
 async def process_analyze_channel(channel_id: int):
@@ -221,8 +168,13 @@ async def process_analyze_channel(channel_id: int):
             return "Channel not found"
             
         # Fetch raw data
-        videos_result = await db.execute(select(Video).filter(Video.channel_id == channel_id))
+        videos_result = await db.execute(
+            select(Video).filter(Video.channel_id == channel_id).order_by(desc(Video.published_at))
+        )
         videos = videos_result.scalars().all()
+        
+        shorts = [v for v in videos if v.content_type == "SHORT"][:20]
+        long_forms = [v for v in videos if v.content_type == "LONG_FORM"][:20]
         
         video_ids = [v.id for v in videos]
         comments = []
@@ -230,22 +182,29 @@ async def process_analyze_channel(channel_id: int):
             comments_result = await db.execute(select(Comment).filter(Comment.video_id.in_(video_ids)))
             comments = comments_result.scalars().all()
             
-        video_data = [{"title": v.title, "view_count": v.view_count, "like_count": v.like_count} for v in videos]
+        shorts_data = [{"title": v.title, "view_count": v.view_count, "like_count": v.like_count, "duration": v.content_type} for v in shorts]
+        long_form_data = [{"title": v.title, "view_count": v.view_count, "like_count": v.like_count, "duration": v.content_type} for v in long_forms]
         comment_data = [{"text": c.text, "author": c.author} for c in comments]
 
         initial_state = {
             "channel_id": channel_id,
             "user_id": channel.user_id,
             "raw_comments": comment_data,
-            "raw_videos": video_data,
-            "raw_competitors": [], # MVP: Fetch from Competitor table
-            "raw_trends": [], # MVP: Fetch from Trend table
+            "raw_videos": [{"title": v.title, "view_count": v.view_count, "like_count": v.like_count} for v in videos],
+            "raw_shorts": shorts_data,
+            "raw_long_form": long_form_data,
+            "raw_competitors": [],
+            "raw_trends": [],
             "comment_insights": {},
             "audience_insights": {},
             "video_insights": {},
+            "shorts_insights": {},
+            "long_form_insights": {},
             "competitor_insights": {},
             "trend_insights": {},
-            "recommendations": []
+            "recommendations": [],
+            "shorts_recommendations": [],
+            "long_form_recommendations": []
         }
         
         try:
@@ -263,9 +222,8 @@ async def process_analyze_channel(channel_id: int):
             # Invoke LangGraph pipeline
             final_state = await app_workflow.ainvoke(initial_state)
             
-            # If LangGraph didn't output recommendations (e.g. due to missing LLM key/errors)
-            # fallback to personalized mockup values
-            if not final_state.get("recommendations") or not final_state.get("audience_insights"):
+            # Fallback to mock insights if API is offline or returns empty recommendations
+            if not final_state.get("shorts_recommendations") or not final_state.get("long_form_recommendations"):
                 final_state = get_fallback_analysis_state(channel_id, channel.user_id, channel.title or "Tech")
 
             # Update Agent Run
@@ -274,6 +232,8 @@ async def process_analyze_channel(channel_id: int):
                 "comment_insights": final_state.get("comment_insights", {}),
                 "audience_insights": final_state.get("audience_insights", {}),
                 "video_insights": final_state.get("video_insights", {}),
+                "shorts_insights": final_state.get("shorts_insights", {}),
+                "long_form_insights": final_state.get("long_form_insights", {}),
                 "competitor_insights": final_state.get("competitor_insights", {}),
                 "trend_insights": final_state.get("trend_insights", {})
             }
@@ -282,12 +242,11 @@ async def process_analyze_channel(channel_id: int):
             health_score = 50.0
             if comment_data:
                 health_score += 20.0
-            if video_data:
+            if videos:
                 health_score += 30.0
             channel.health_score = min(health_score, 100.0)
             
             # Save Audience Insights
-            # First check if audience insights already exist
             aud_result = await db.execute(select(AudienceInsight).filter(AudienceInsight.channel_id == channel_id))
             audience_insight = aud_result.scalars().first()
             if not audience_insight:
@@ -307,13 +266,13 @@ async def process_analyze_channel(channel_id: int):
                 audience_insight.content_gaps = final_state.get("competitor_insights", {}).get("content_gaps", [])
                 audience_insight.requested_topics = final_state.get("audience_insights", {}).get("requested_topics", [])
 
-            from sqlalchemy import delete
+            # Clear old recommendations
             await db.execute(
                 delete(Recommendation).where(Recommendation.channel_id == channel_id)
             )
 
-            # Save Recommendations
-            for rec in final_state.get("recommendations", []):
+            # Save Shorts Recommendations
+            for rec in final_state.get("shorts_recommendations", []):
                 recommendation = Recommendation(
                     channel_id=channel_id,
                     suggested_title=rec.get("title") or rec.get("suggested_title", ""),
@@ -328,16 +287,36 @@ async def process_analyze_channel(channel_id: int):
                     related_videos=rec.get("related_videos", []),
                     related_comments=rec.get("related_comments", []),
                     related_trends=rec.get("related_trends", []),
-                    memories_used=rec.get("memories_used", [])
+                    memories_used=rec.get("memories_used", []),
+                    content_type="SHORT"
+                )
+                db.add(recommendation)
+
+            # Save Long Form Recommendations
+            for rec in final_state.get("long_form_recommendations", []):
+                recommendation = Recommendation(
+                    channel_id=channel_id,
+                    suggested_title=rec.get("title") or rec.get("suggested_title", ""),
+                    confidence_score=rec.get("confidence_score", 0.0),
+                    audience_match_score=rec.get("audience_score", 0.0),
+                    reasoning=json.dumps(rec.get("reasoning", [])) if isinstance(rec.get("reasoning"), list) else str(rec.get("reasoning", "")),
+                    audience_score=rec.get("audience_score", 0.0),
+                    historical_score=rec.get("historical_score", 0.0),
+                    trend_score=rec.get("trend_score", 0.0),
+                    competition_score=rec.get("competition_score", 0.0),
+                    evidence=rec.get("evidence", []),
+                    related_videos=rec.get("related_videos", []),
+                    related_comments=rec.get("related_comments", []),
+                    related_trends=rec.get("related_trends", []),
+                    memories_used=rec.get("memories_used", []),
+                    content_type="LONG_FORM"
                 )
                 db.add(recommendation)
 
             # Seed default memories if empty
-            from app.db.models import Memory
             mem_result = await db.execute(select(Memory).filter(Memory.channel_id == channel_id))
             existing_memories = mem_result.scalars().all()
             if not existing_memories:
-                # Determine topic from theme (channel title)
                 theme = channel.title or "Tech"
                 topic = "Tech & Software Development"
                 if any(k in theme.lower() for k in ["cook", "food", "chef", "recipe"]):
@@ -353,111 +332,31 @@ async def process_analyze_channel(channel_id: int):
 
                 if topic == "Cooking & Culinary Arts":
                     default_memories = [
-                        Memory(
-                            channel_id=channel_id,
-                            category="Audience",
-                            content="Audience responds well to budget meal prep challenges and quick weekday dinner guides.",
-                            context_tags=["audience-engagement", "budget-cooking"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Recommendation",
-                            content="Previous dessert recipe videos performed 30% better than average video uploads.",
-                            context_tags=["desserts", "performance"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Preference",
-                            content="Viewer feedback indicates high interest in baking and quick 15-minute ideas.",
-                            context_tags=["baking", "quick-recipes"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Trend",
-                            content="Search volume for '15-minute healthy meals' has increased by 150% in the last 30 days.",
-                            context_tags=["trends", "healthy-eating"]
-                        )
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Quick recipe Shorts (under 30s) perform well.", context_tags=["quick-recipes"]),
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Baking Shorts underperform due to lack of fast pacing.", context_tags=["baking"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Detailed dinner prep tutorials perform well.", context_tags=["dinner-prep"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Budget grocery store case studies generate high retention.", context_tags=["budget-grocery"]),
                     ]
                 elif topic == "Travel & Adventure Vlogs":
                     default_memories = [
-                        Memory(
-                            channel_id=channel_id,
-                            category="Audience",
-                            content="Audience loves off-the-beaten-path travel vlogs and detailed travel budgeting tips.",
-                            context_tags=["solo-travel", "budgeting"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Recommendation",
-                            content="Previous Asia series videos performed 50% better than average uploads.",
-                            context_tags=["asia-vlogs", "performance"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Preference",
-                            content="Viewer feedback indicates high interest in local street food and packing guides.",
-                            context_tags=["street-food", "packing"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Trend",
-                            content="Search volume for 'cheap summer destinations' has increased by 200% in the last 30 days.",
-                            context_tags=["trends", "cheap-travel"]
-                        )
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Street food preview Shorts perform extremely well.", context_tags=["street-food"]),
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Packing tip Shorts underperform.", context_tags=["packing"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Solo travel budget guide videos perform well.", context_tags=["solo-travel"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Asia series itineraries generate high retention.", context_tags=["asia-series"]),
                     ]
                 elif topic == "Experiments, Stunts & Creative Challenges":
                     default_memories = [
-                        Memory(
-                            channel_id=channel_id,
-                            category="Audience",
-                            content="Audience responds well to highly visual chemical reactions and vehicle stunt modifications.",
-                            context_tags=["audience-engagement", "stunts"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Recommendation",
-                            content="Previous liquid nitrogen and engine modification videos performed 85% better than average uploads.",
-                            context_tags=["liquid-nitrogen", "mods"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Preference",
-                            content="Viewer feedback indicates high interest in large-scale experiments and slow-motion breakdowns.",
-                            context_tags=["experiments", "slow-mo"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Trend",
-                            content="Search volume for 'crazy science experiments at home' has increased by 180% in the last 30 days.",
-                            context_tags=["trends", "experiments"]
-                        )
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Fast-paced visual chemistry explosion Shorts perform well.", context_tags=["explosions"]),
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Long explanation Shorts underperform.", context_tags=["science"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Giant pool and liquid nitrogen stunt videos perform well.", context_tags=["nitrogen"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="Hydrogen engine modification challenges generate high retention.", context_tags=["hydrogen-engine"]),
                     ]
                 else: # Tech
                     default_memories = [
-                        Memory(
-                            channel_id=channel_id,
-                            category="Audience",
-                            content="Audience responds well to time-saving challenges and hands-on coding guides.",
-                            context_tags=["audience-engagement", "challenges"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Recommendation",
-                            content="Previous Next.js 15 course videos performed 45% better than average video uploads.",
-                            context_tags=["nextjs", "performance"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Preference",
-                            content="Viewer feedback indicates high interest in Agentic AI frameworks (LangGraph, CrewAI).",
-                            context_tags=["agentic-ai", "frameworks"]
-                        ),
-                        Memory(
-                            channel_id=channel_id,
-                            category="Trend",
-                            content="Search volume for 'LangGraph' and 'Agentic Workflows' has increased by 300% in the last 30 days.",
-                            context_tags=["trends", "langgraph"]
-                        )
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="AI News Shorts perform well.", context_tags=["ai-news"]),
+                        Memory(channel_id=channel_id, category="SHORTS_MEMORY", content="Productivity Shorts underperform.", context_tags=["productivity"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="AI Tutorials perform well.", context_tags=["ai-tutorials"]),
+                        Memory(channel_id=channel_id, category="LONG_FORM_MEMORY", content="SaaS Case Studies generate high retention.", context_tags=["saas-case-studies"]),
                     ]
                 for memory in default_memories:
                     db.add(memory)

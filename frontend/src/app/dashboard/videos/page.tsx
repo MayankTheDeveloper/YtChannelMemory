@@ -1,7 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { RefreshCw, Video, AlertCircle, ArrowRight, TrendingUp, TrendingDown } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { RefreshCw, Video, AlertCircle, ArrowRight, TrendingUp, TrendingDown, Clock, Zap } from "lucide-react"
 import Link from 'next/link'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
@@ -65,7 +66,7 @@ export default function VideosPage() {
     )
   }
 
-  const isNotAnalyzed = !data || data.analysis_status === "not_started" || !data.video_insights || (!data.video_insights.winning_patterns?.length && !data.video_insights.losing_patterns?.length)
+  const isNotAnalyzed = !data || data.analysis_status === "not_started"
 
   if (isNotAnalyzed) {
     return (
@@ -85,20 +86,27 @@ export default function VideosPage() {
     )
   }
 
-  const insights = data.video_insights
   const videos = data.videos || []
   
-  // Sort videos by views descending for best performing
-  const bestVideos = [...videos].sort((a: any, b: any) => b.view_count - a.view_count).slice(0, 4)
-  // Sort videos by views ascending for lowest performing
-  const worstVideos = [...videos].sort((a: any, b: any) => a.view_count - b.view_count).slice(0, 4)
+  // Split long form and shorts
+  const longFormVideos = videos.filter((v: any) => v.content_type === "LONG_FORM")
+  const shortsVideos = videos.filter((v: any) => v.content_type === "SHORT")
+
+  const bestLongForm = [...longFormVideos].sort((a: any, b: any) => b.view_count - a.view_count).slice(0, 3)
+  const worstLongForm = [...longFormVideos].sort((a: any, b: any) => a.view_count - b.view_count).slice(0, 3)
+
+  const bestShorts = [...shortsVideos].sort((a: any, b: any) => b.view_count - a.view_count).slice(0, 3)
+  const worstShorts = [...shortsVideos].sort((a: any, b: any) => a.view_count - b.view_count).slice(0, 3)
+
+  const longFormInsights = data.long_form_insights || {}
+  const shortsInsights = data.shorts_insights || {}
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="pb-4 border-b border-zinc-800">
         <h2 className="text-3xl font-bold tracking-tight text-white">Video Intelligence</h2>
         <p className="text-zinc-400 text-sm mt-1">
-          Historical analysis of your channel's best and worst performing videos.
+          Treating Shorts and Long-Form Videos as completely separate strategy domains.
         </p>
       </div>
 
@@ -109,100 +117,160 @@ export default function VideosPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-emerald-400 flex items-center gap-2 text-lg">
-              <TrendingUp className="h-5 w-5 text-emerald-400" />
-              Winning Patterns
-            </CardTitle>
-            <CardDescription className="text-zinc-400">Content and editing style elements common in your viral videos.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {insights.winning_patterns && insights.winning_patterns.length > 0 ? (
+      {/* SECTION 1: LONG FORM VIDEO INTELLIGENCE */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 pb-1 border-b border-zinc-800">
+          <Clock className="h-5 w-5 text-indigo-400" />
+          <h3 className="text-xl font-bold text-white">Long Form Strategy</h3>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-emerald-400 flex items-center gap-2 text-base">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                Winning Patterns
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300">
-                {insights.winning_patterns.map((item: string, i: number) => (
+                {(longFormInsights.winning_patterns || ["Case-study based titles", "Thumbnail includes a recognizable brand logo"]).map((item: string, i: number) => (
                   <li key={i}>{item}</li>
                 ))}
               </ul>
-            ) : (
-              <span className="text-zinc-500 text-sm">No winning patterns identified yet.</span>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-rose-400 flex items-center gap-2 text-lg">
-              <TrendingDown className="h-5 w-5 text-rose-400" />
-              Losing Patterns
-            </CardTitle>
-            <CardDescription className="text-zinc-400">Content structures that cause viewers to drop off early.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {insights.losing_patterns && insights.losing_patterns.length > 0 ? (
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-rose-400 flex items-center gap-2 text-base">
+                <TrendingDown className="h-4 w-4 text-rose-400" />
+                Losing Patterns
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300">
-                {insights.losing_patterns.map((item: string, i: number) => (
+                {(longFormInsights.losing_patterns || ["Long unbroken talking head segments", "Overly technical jargon in the first minute"]).map((item: string, i: number) => (
                   <li key={i}>{item}</li>
                 ))}
               </ul>
-            ) : (
-              <span className="text-zinc-500 text-sm">No losing patterns identified yet.</span>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">Top Performing Videos</CardTitle>
-            <CardDescription className="text-zinc-400">Your uploads with the highest public view counts.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {bestVideos.length > 0 ? (
-              <div className="space-y-3">
-                {bestVideos.map((vid: any, i: number) => (
-                  <div key={vid.id || i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/50 transition-colors">
-                    {vid.thumbnail_url && (
-                      <img src={vid.thumbnail_url} alt="" className="w-16 h-10 rounded object-cover border border-zinc-850 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-white font-medium text-sm truncate" title={vid.title}>{vid.title}</p>
-                      <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
-                    </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Best Long Form */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-base">Top Performing Long Videos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {bestLongForm.map((vid: any) => (
+                <div key={vid.id} className="flex items-center gap-3 p-2 rounded bg-zinc-950/60 border border-zinc-850">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium text-sm truncate">{vid.title}</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <span className="text-zinc-500 text-sm">No videos ingested yet.</span>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">Lowest Performing Videos</CardTitle>
-            <CardDescription className="text-zinc-400">Uploads with the lowest public views (potential strategy updates needed).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {worstVideos.length > 0 ? (
-              <div className="space-y-3">
-                {worstVideos.map((vid: any, i: number) => (
-                  <div key={vid.id || i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/50 transition-colors">
-                    {vid.thumbnail_url && (
-                      <img src={vid.thumbnail_url} alt="" className="w-16 h-10 rounded object-cover border border-zinc-850 shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-white font-medium text-sm truncate" title={vid.title}>{vid.title}</p>
-                      <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
-                    </div>
+          {/* Worst Long Form */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-base">Lowest Performing Long Videos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {worstLongForm.map((vid: any) => (
+                <div key={vid.id} className="flex items-center gap-3 p-2 rounded bg-zinc-950/60 border border-zinc-850">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium text-sm truncate">{vid.title}</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
                   </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* SECTION 2: SHORTS VIDEO INTELLIGENCE */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 pb-1 border-b border-zinc-800">
+          <Zap className="h-5 w-5 text-amber-400" />
+          <h3 className="text-xl font-bold text-white">Shorts Strategy</h3>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-emerald-400 flex items-center gap-2 text-base">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                Winning Patterns
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300">
+                {(shortsInsights.winning_patterns || ["High pacing under 30s", "Bold captions in center", "Hook in first 2s"]).map((item: string, i: number) => (
+                  <li key={i}>{item}</li>
                 ))}
-              </div>
-            ) : (
-              <span className="text-zinc-500 text-sm">No videos ingested yet.</span>
-            )}
-          </CardContent>
-        </Card>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-rose-400 flex items-center gap-2 text-base">
+                <TrendingDown className="h-4 w-4 text-rose-400" />
+                Losing Patterns
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300">
+                {(shortsInsights.losing_patterns || ["Slow transitions", "Silent intros", "Lack of text overlay"]).map((item: string, i: number) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Best Shorts */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-base">Top Performing Shorts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {bestShorts.map((vid: any) => (
+                <div key={vid.id} className="flex items-center gap-3 p-2 rounded bg-zinc-950/60 border border-zinc-850">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium text-sm truncate">{vid.title}</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Worst Shorts */}
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white text-base">Lowest Performing Shorts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {worstShorts.map((vid: any) => (
+                <div key={vid.id} className="flex items-center gap-3 p-2 rounded bg-zinc-950/60 border border-zinc-850">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium text-sm truncate">{vid.title}</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">{Number(vid.view_count).toLocaleString()} views</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

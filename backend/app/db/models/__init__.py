@@ -42,6 +42,7 @@ class Video(Base):
     like_count = Column(Integer, default=0)
     retention_metric = Column(Float, default=0.0)
     thumbnail_url = Column(String)
+    content_type = Column(String, default="LONG_FORM", nullable=False)
 
     channel = relationship("Channel", back_populates="videos")
     comments = relationship("Comment", back_populates="video")
@@ -108,6 +109,7 @@ class Recommendation(Base):
 
     # Phase 3: Hindsight Pivot
     memories_used = Column(JSON, default=list)
+    content_type = Column(String, default="LONG_FORM", nullable=False)
 
     channel = relationship("Channel", back_populates="recommendations")
 

@@ -78,4 +78,14 @@ class MemoryService:
             
         return context
 
+    async def build_memory_context_by_category(self, db: AsyncSession, channel_id: int, category: str) -> str:
+        """
+        Builds a compiled string of all relevant memories for a specific memory category.
+        """
+        mems = await self.recall_memories(db, MemorySearch(channel_id=channel_id, category=category, limit=10))
+        context = f"--- HISTORICAL {category} ---\n"
+        for m in mems:
+            context += f"- {m.content}\n"
+        return context
+
 memory_service = MemoryService()
